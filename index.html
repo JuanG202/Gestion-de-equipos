@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Equipos</title>
+  <link rel="icon" type="image/png" href="/assests/trabajando-en-casa.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/Script.js" defer></script>
+<base target="_blank">
+</head>
+<body>
+<div id="app" class="kimi-container">
+  <div class="header">
+    <div>
+      <h1>EL MUNDO DE LA TECNOLOGIA</h1>
+      <p>Historial completo de clientes, equipos y cotizaciones</p>
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-secondary" onclick="exportBackup()">⬇️ Backup</button>
+      <label class="btn btn-secondary" style="margin:0;">⬆️ Restaurar<input type="file" accept=".json" style="display:none;" onchange="importBackup(this)"></label>
+      <button class="btn btn-primary" onclick="openModal('client')">+ Nuevo Cliente</button>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-number" id="statClients">0</div>
+      <div class="stat-label">Clientes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="statDevices">0</div>
+      <div class="stat-label">Equipos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="statPending">0</div>
+      <div class="stat-label">Pendientes</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number" id="statReminders">0</div>
+      <div class="stat-label">Recordatorios</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('clients')" id="tab-clients">👥 Clientes</button>
+    <button class="tab" onclick="switchTab('devices')" id="tab-devices">💻 Equipos</button>
+    <button class="tab" onclick="switchTab('history')" id="tab-history">📋 Historial</button>
+    <button class="tab" onclick="switchTab('reminders')" id="tab-reminders">🔔 Recordatorios</button>
+  </div>
+
+  <!-- CLIENTES -->
+  <div id="view-clients">
+    <div class="search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchClients" placeholder="Buscar por nombre, teléfono o email..." oninput="renderClients()">
+    </div>
+    <div id="clientsList"></div>
+  </div>
+
+  <!-- EQUIPOS -->
+  <div id="view-devices" class="hidden">
+    <div class="search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchDevices" placeholder="Buscar por marca, modelo o serial..." oninput="renderDevices()">
+    </div>
+    <div id="devicesList"></div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="view-history" class="hidden">
+    <div class="search-box">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchHistory" placeholder="Buscar en historial de trabajos..." oninput="renderHistory()">
+    </div>
+    <div id="historyList"></div>
+  </div>
+
+  <!-- RECORDATORIOS -->
+  <div id="view-reminders" class="hidden">
+    <div id="remindersList"></div>
+  </div>
+
+  <!-- MODAL CLIENTE -->
+  <div id="modal-client" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'client')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>👤 Nuevo Cliente</h2>
+        <button class="close-btn" onclick="closeModal('client')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Nombre completo *</label>
+        <input type="text" id="cName" placeholder="Ej: Juan Pérez">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Teléfono *</label>
+          <input type="text" id="cPhone" placeholder="Ej: 3001234567">
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="cEmail" placeholder="Ej: cliente@email.com">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Dirección</label>
+        <input type="text" id="cAddress" placeholder="Ej: Calle 123 #45-67">
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="saveClient()">Guardar Cliente</button>
+    </div>
+  </div>
+
+  <!-- MODAL EQUIPO -->
+  <div id="modal-device" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'device')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>💻 Nuevo Equipo</h2>
+        <button class="close-btn" onclick="closeModal('device')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Cliente *</label>
+        <select id="dClientId"></select>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Tipo *</label>
+          <select id="dType">
+            <option value="Laptop">Laptop</option>
+            <option value="PC Escritorio">PC Escritorio</option>
+            <option value="iMac/MacBook">iMac/MacBook</option>
+            <option value="Tablet">Tablet</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Marca *</label>
+          <input type="text" id="dBrand" placeholder="Ej: HP, Dell, Apple">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Modelo</label>
+          <input type="text" id="dModel" placeholder="Ej: Pavilion 15">
+        </div>
+        <div class="form-group">
+          <label>Serial / Service Tag</label>
+          <input type="text" id="dSerial" placeholder="Ej: CZC1234ABC">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Especificaciones</label>
+        <textarea id="dSpecs" placeholder="Procesador, RAM, Disco, etc."></textarea>
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="saveDevice()">Guardar Equipo</button>
+    </div>
+  </div>
+
+  <!-- MODAL SERVICIO -->
+  <div id="modal-service" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'service')">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📋 Nuevo Servicio / Cotización</h2>
+        <button class="close-btn" onclick="closeModal('service')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>Equipo *</label>
+        <select id="sDeviceId"></select>
+      </div>
+      <div class="form-group">
+        <label>Tipo de servicio *</label>
+        <select id="sServiceType">
+          <option value="Diagnóstico">Diagnóstico</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+          <option value="Reparación">Reparación</option>
+          <option value="Actualización">Actualización de componentes</option>
+          <option value="Recuperación de datos">Recuperación de datos</option>
+          <option value="Instalación de software">Instalación de software</option>
+          <option value="Limpieza">Limpieza general</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Descripción del problema / trabajo *</label>
+        <textarea id="sDescription" placeholder="Describe el diagnóstico, el problema reportado o el trabajo a realizar..."></textarea>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Valor cotizado ($)</label>
+          <input type="text" inputmode="numeric" id="sPrice" placeholder="0" oninput="formatPriceInput(this)">
+        </div>
+        <div class="form-group">
+          <label>Estado *</label>
+          <select id="sStatus">
+            <option value="Pendiente">Pendiente (Cotización enviada)</option>
+            <option value="Autorizado">Autorizado (En reparación)</option>
+            <option value="Completado">Completado (Entregado)</option>
+            <option value="Cancelado">Cancelado / No autorizado</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Recordar próximo mantenimiento</label>
+        <select id="sReminderMonths">
+          <option value="">Sin recordatorio</option>
+          <option value="1">En 1 mes</option>
+          <option value="3">En 3 meses</option>
+          <option value="6">En 6 meses</option>
+          <option value="12">En 12 meses</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notas adicionales</label>
+        <textarea id="sNotes" placeholder="Piezas cambiadas, garantía, recomendaciones..."></textarea>
+      </div>
+      <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="saveService()">Guardar Servicio</button>
+    </div>
+  </div>
+
+  <!-- MODAL DETALLE -->
+  <div id="modal-detail" class="modal-overlay hidden" onclick="closeModalOnOverlay(event, 'detail')">
+    <div class="modal" style="max-width: 700px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="detailTitle">👤 Detalle</h2>
+        <button class="close-btn" onclick="closeModal('detail')">&times;</button>
+      </div>
+      <div id="detailContent"></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
