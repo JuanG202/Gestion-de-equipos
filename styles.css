@@ -38,16 +38,27 @@ body {
 }
 
 .header h1 {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--text-primary);
+    font-size: 25px;
+    font-family: 'Times New Roman', Times, serif;
+    color: rgb(0, 107, 194);
+    font-weight: bold;
     margin: 0;
+    border-bottom: 2px solid rgb(0, 107, 194);
+    display: inline-block;
+    padding-bottom: 5px; 
+    position: relative;
+    top: -3px;
 }
 
 .header p {
     color: var(--text-secondary);
     font-size: 14px;
     margin: 4px 0 0 0;
+}
+
+.img{
+    width: 80px;
+    height: 80px;
 }
 
 .btn {
@@ -92,6 +103,7 @@ body {
     padding: 6px 12px;
     font-size: 13px;
 }
+
 
 .card {
     background: var(--surface);
