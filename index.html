@@ -1,6 +1,28 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+  <style>
+.qp-page{max-width:800px;margin:0 auto;padding:40px;font-family:Georgia,'Times New Roman',serif;color:#1a1a1a;position:relative;}
+.qp-header{text-align:center;border-bottom:3px solid #1a5276;padding-bottom:14px;margin-bottom:20px;}
+.qp-company{font-size:26px;font-weight:bold;color:#1a5276;letter-spacing:1px;margin-bottom:6px;}
+.qp-sub{font-size:12px;color:#333;margin:2px 0;}
+.qp-title{text-align:left;font-size:16px;font-weight:bold;margin:18px 0 4px;}
+.qp-page p{font-size:13px;margin:6px 0;}
+.qp-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;}
+.qp-table th{background:#1a5276;color:#fff;padding:8px;text-align:left;}
+.qp-table td{padding:7px 8px;border-bottom:1px solid #ccc;}
+.qp-subtotal td{border-top:2px solid #1a5276;font-weight:bold;}
+.qp-total td{font-weight:bold;color:#1a5276;font-size:14px;}
+.qp-h3{font-size:14px;font-weight:bold;margin:20px 0 8px;}
+.qp-list{font-size:13px;margin:0 0 16px 18px;padding:0;}
+.qp-list li{margin-bottom:4px;}
+.qp-signature{margin-top:30px;font-size:13px;line-height:1.6;}
+@media print{
+  body *{visibility:hidden;}
+  #quotePrintArea, #quotePrintArea *{visibility:visible;}
+  #quotePrintArea{position:absolute;top:0;left:0;width:100%;}
+}
+</style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestión de Equipos</title>
