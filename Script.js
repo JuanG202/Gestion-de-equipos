@@ -810,6 +810,7 @@ function printQuote(id) {
   document.getElementById('quotePrintArea').innerHTML = `
     <div class="qp-page">
       <div class="qp-header">
+        <img src="/assests/El Mundo de la Tecnologia sin fondo.png" class="qp-logo">
         <div class="qp-company">EL MUNDO DE LA TECNOLOGÍA</div>
         <div class="qp-sub">Soporte Técnico, Mantenimiento, Desarrollo y Actualización de Aplicaciones Web</div>
         <div class="qp-sub">Cali, Colombia &nbsp;|&nbsp; Tel: 305 239 9750</div>
