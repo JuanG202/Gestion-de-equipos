@@ -673,6 +673,7 @@ function saveQuote() {
   const validityDays = parseInt(document.getElementById('qValidityDays').value) || 15;
   const paymentTerms = document.getElementById('qPaymentTerms').value.trim() || 'Contra entrega';
   const conditions = document.getElementById('qConditions').value;
+  const tecnico = document.getElementById('qTecnico').value;
   const cleanItems = items.map(it => ({ desc: it.desc.trim(), qty: it.qty, price: it.price || '0' }));
 
   if (editingQuoteId) {
@@ -685,6 +686,7 @@ function saveQuote() {
       qu.validityDays = validityDays;
       qu.paymentTerms = paymentTerms;
       qu.conditions = conditions;
+      qu.tecnico = tecnico;
     }
   } else {
     quotations.push({
@@ -694,6 +696,7 @@ function saveQuote() {
       clientId, clientName, clientPhone,
       items: cleanItems,
       validityDays, paymentTerms, conditions,
+      tecnico,
       status: 'Pendiente',
       createdAt: Date.now()
     });
@@ -718,6 +721,7 @@ function editQuote(id) {
   document.getElementById('qValidityDays').value = qu.validityDays || 15;
   document.getElementById('qPaymentTerms').value = qu.paymentTerms || 'Contra entrega';
   document.getElementById('qConditions').value = qu.conditions || '';
+  document.getElementById('qTecnico').value = qu.tecnico || 'Juan Pablo Granja';
   renderQuoteItemsForm();
   document.getElementById('quoteModalTitle').textContent = '✏️ Editar Cotización No. ' + qu.number;
   document.getElementById('quoteSaveBtn').textContent = 'Guardar Cambios';
@@ -829,25 +833,11 @@ function printQuote(id) {
       <h3 class="qp-h3">Condiciones Comerciales</h3>
       <ul class="qp-list">${conditionLines}</ul>
       <p>Agradecemos la oportunidad de presentarle esta cotización.<br>Quedamos atentos a cualquier duda o ajuste que requiera.</p>
-      <div class="qp-signatures" style="display:flex; gap:20px; flex-wrap:wrap; margin-top:20px;">
-        <div class="qp-signature">
-          <strong>JUAN PABLO GRANJA</strong><br>
-          Tecnólogo en Sistemas<br>
-          Cel: 305 239 9750<br>
-          "El Mundo de la Tecnología"
-        </div>
-        <div class="qp-signature">
-          <strong>LEIDY TATIANA MONTOYA</strong><br>
-          Tecnóloga en Sistemas<br>
-          Cel: 305 239 9750<br>
-          "El Mundo de la Tecnología"
-        </div>
-        <div class="qp-signature">
-          <strong>KEVIN ALEXIS RIVAS</strong><br>
-          Tecnólogo en Sistemas<br>
-          Cel: 305 239 9750<br>
-          "El Mundo de la Tecnología"
-        </div>
+      <div class="qp-signature">
+        <strong>${(qu.tecnico || 'JUAN PABLO GRANJA').toUpperCase()}</strong><br>
+        ${qu.tecnico === 'Leidy Tatiana Montoya' ? 'Tecnóloga en Sistemas' : 'Tecnólogo en Sistemas'}<br>
+        Cel: 305 239 9750<br>
+        "El Mundo de la Tecnología"
       </div>
     </div>
   `;
