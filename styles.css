@@ -598,33 +598,55 @@ body {
     border-collapse: collapse;
     margin: 14px 0;
     font-size: 13px;
+    box-shadow: 0 1px 8px rgba(0,60,110,0.08);
+}
+
+.qp-table thead tr {
+    background: linear-gradient(90deg, rgb(0, 74, 145), rgb(0, 107, 194));
 }
 
 .qp-table th {
-    background: rgb(0, 107, 194);
     color: white;
-    padding: 8px 10px;
+    padding: 10px 12px;
     text-align: left;
     font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.qp-table th:nth-child(3),
+.qp-table th:nth-child(4) {
+    text-align: right;
 }
 
 .qp-table td {
-    padding: 8px 10px;
+    padding: 9px 12px;
     border-bottom: 1px solid #e1e3ec;
+    color: #1f2a3c;
+}
+
+.qp-table tbody tr:nth-child(odd):not(.qp-subtotal):not(.qp-total) {
+    background: #f4f8fc;
+}
+
+.qp-table tbody tr:not(.qp-subtotal):not(.qp-total):hover {
+    background: #e7f0fa;
 }
 
 .qp-table tr.qp-subtotal td {
-    border-top: 1px solid #999;
+    border-top: 2px solid rgb(0, 107, 194);
     border-bottom: none;
     font-weight: 600;
-    padding-top: 10px;
+    padding-top: 12px;
+    color: #333;
 }
 
 .qp-table tr.qp-total td {
     font-weight: 700;
-    font-size: 14px;
+    font-size: 15px;
+    color: rgb(0, 74, 145);
+    padding-top: 6px;
+    padding-bottom: 12px;
 }
-
 .qp-list {
     font-size: 13px;
     padding-left: 20px;
@@ -651,4 +673,12 @@ body {
     .qp-page {
         padding: 0;
     }
+}
+
+.footer {
+    font-family:Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+    text-align: center;
+    align-items: center;
+    font-style: italic;
+    color: #333;
 }
