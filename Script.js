@@ -1,21 +1,58 @@
-let clients = JSON.parse(localStorage.getItem('tp_clients') || '[]');
-let devices = JSON.parse(localStorage.getItem('tp_devices') || '[]');
-let services = JSON.parse(localStorage.getItem('tp_services') || '[]');
-let quotations = JSON.parse(localStorage.getItem('tp_quotations') || '[]');
-let editingServiceId = null; // null = creando servicio nuevo, si tiene valor = editando ese servicio
-let editingQuoteId = null; // null = creando cotización nueva, si tiene valor = editando esa cotización
-let quoteItemsTemp = []; // items en edición dentro del modal de cotización
-let currentDetail = null; // {type: 'client'|'device'|'quote', id} - para refrescar el modal de detalle si está abierto
+// Si el frontend se sirve desde el mismo servidor Express, deja API_BASE = '/api'.
+// Si lo sirves aparte (ej. otro puerto/dominio), cambia esto por la URL completa,
+// ej: 'http://localhost:3000/api'
+const API_BASE = 'http://localhost:3000/api';
 
-function saveAll() {
-  localStorage.setItem('tp_clients', JSON.stringify(clients));
-  localStorage.setItem('tp_devices', JSON.stringify(devices));
-  localStorage.setItem('tp_services', JSON.stringify(services));
-  localStorage.setItem('tp_quotations', JSON.stringify(quotations));
-  updateStats();
+async function apiRequest(path, options = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  let data = null;
+  try { data = await res.json(); } catch (_) { /* respuesta vacía */ }
+  if (!res.ok) {
+    const message = (data && data.error) || `Error ${res.status}`;
+    throw new Error(message);
+  }
+  return data;
 }
 
-function genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function apiGet(path) {
+  return apiRequest(path);
+}
+function apiPost(path, body) {
+  return apiRequest(path, { method: 'POST', body: JSON.stringify(body) });
+}
+function apiPut(path, body) {
+  return apiRequest(path, { method: 'PUT', body: JSON.stringify(body) });
+}
+function apiDelete(path) {
+  return apiRequest(path, { method: 'DELETE' });
+}
+// Requiere que api.js esté cargado antes que este archivo (apiGet/apiPost/apiPut/apiDelete).
+
+let clients = [];
+let devices = [];
+let services = [];
+let quotations = [];
+let editingServiceId = null; // null = creando servicio nuevo, si tiene valor = editando ese servicio
+let editingQuoteId = null; // null = creando cotización nueva, si tiene valor = editando esa cotización
+let quoteItemsTemp = []; // items en edición dentro del modal de cotización (solo en memoria, no vienen de la BD)
+let currentDetail = null; // {type: 'client'|'device'|'quote', id} - para refrescar el modal de detalle si está abierto
+
+// Genera un id temporal SOLO para los ítems de cotización que aún no se han guardado.
+function tempId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+
+async function loadAll() {
+  const [c, d, s, q] = await Promise.all([
+    apiGet('/clients'),
+    apiGet('/devices'),
+    apiGet('/services'),
+    apiGet('/quotations')
+  ]);
+  clients = c; devices = d; services = s; quotations = q;
+  updateStats();
+}
 
 function formatPriceInput(input) {
   const raw = input.value.replace(/\D/g, '');
@@ -53,9 +90,9 @@ function switchTab(tab) {
 function renderClients() {
   const q = document.getElementById('searchClients').value.toLowerCase();
   const list = document.getElementById('clientsList');
-  const filtered = clients.filter(c => 
-    c.name.toLowerCase().includes(q) || 
-    c.phone.includes(q) || 
+  const filtered = clients.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    c.phone.includes(q) ||
     (c.email || '').toLowerCase().includes(q)
   ).sort((a,b) => b.createdAt - a.createdAt);
 
@@ -65,13 +102,13 @@ function renderClients() {
   }
 
   list.innerHTML = filtered.map(c => {
-    const devCount = devices.filter(d => d.clientId === c.id).length;
+    const devCount = devices.filter(d => d.clientId === c._id).length;
     const svcCount = services.filter(s => {
-      const d = devices.find(x => x.id === s.deviceId);
-      return d && d.clientId === c.id;
+      const d = devices.find(x => x._id === s.deviceId);
+      return d && d.clientId === c._id;
     }).length;
     return `
-      <div class="client-row" onclick="showClientDetail('${c.id}')">
+      <div class="client-row" onclick="showClientDetail('${c._id}')">
         <div class="client-info">
           <h4>${c.name}</h4>
           <span>📞 ${c.phone}${c.email ? ' &nbsp;|&nbsp; ✉️ ' + c.email : ''}</span>
@@ -79,34 +116,38 @@ function renderClients() {
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <span class="tag">${devCount} equipo${devCount!==1?'s':''}</span>
           <span class="tag">${svcCount} servicio${svcCount!==1?'s':''}</span>
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openDeviceModal('${c.id}')">+ Equipo</button>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openDeviceModal('${c._id}')">+ Equipo</button>
         </div>
       </div>`;
   }).join('');
 }
 
-function saveClient() {
+async function saveClient() {
   const name = document.getElementById('cName').value.trim();
   const phone = document.getElementById('cPhone').value.trim();
   if (!name || !phone) { alert('Nombre y teléfono son obligatorios'); return; }
-  clients.push({
-    id: genId(), name, phone,
-    email: document.getElementById('cEmail').value.trim(),
-    address: document.getElementById('cAddress').value.trim(),
-    createdAt: Date.now()
-  });
-  saveAll();
-  closeModal('client');
-  ['cName','cPhone','cEmail','cAddress'].forEach(id => document.getElementById(id).value = '');
-  renderClients();
+  try {
+    const newClient = await apiPost('/clients', {
+      name, phone,
+      email: document.getElementById('cEmail').value.trim(),
+      address: document.getElementById('cAddress').value.trim()
+    });
+    clients.push(newClient);
+    updateStats();
+    closeModal('client');
+    ['cName','cPhone','cEmail','cAddress'].forEach(id => document.getElementById(id).value = '');
+    renderClients();
+  } catch (err) {
+    alert('Error al guardar el cliente: ' + err.message);
+  }
 }
 
 function renderDevices() {
   const q = document.getElementById('searchDevices').value.toLowerCase();
   const list = document.getElementById('devicesList');
-  const filtered = devices.filter(d => 
-    d.brand.toLowerCase().includes(q) || 
-    (d.model || '').toLowerCase().includes(q) || 
+  const filtered = devices.filter(d =>
+    d.brand.toLowerCase().includes(q) ||
+    (d.model || '').toLowerCase().includes(q) ||
     (d.serial || '').toLowerCase().includes(q) ||
     d.type.toLowerCase().includes(q)
   ).sort((a,b) => b.createdAt - a.createdAt);
@@ -117,11 +158,11 @@ function renderDevices() {
   }
 
   list.innerHTML = filtered.map(d => {
-    const client = clients.find(c => c.id === d.clientId);
-    const svcCount = services.filter(s => s.deviceId === d.id).length;
-    const lastSvc = services.filter(s => s.deviceId === d.id).sort((a,b) => b.date - a.date)[0];
+    const client = clients.find(c => c._id === d.clientId);
+    const svcCount = services.filter(s => s.deviceId === d._id).length;
+    const lastSvc = services.filter(s => s.deviceId === d._id).sort((a,b) => b.date - a.date)[0];
     return `
-      <div class="client-row" onclick="showDeviceDetail('${d.id}')">
+      <div class="client-row" onclick="showDeviceDetail('${d._id}')">
         <div class="client-info">
           <h4>${d.type} ${d.brand} ${d.model || ''}</h4>
           <span>👤 ${client ? client.name : 'Sin cliente'} &nbsp;|&nbsp; Serial: ${d.serial || 'N/A'}</span>
@@ -129,7 +170,7 @@ function renderDevices() {
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <span class="tag">${svcCount} servicio${svcCount!==1?'s':''}</span>
           ${lastSvc ? `<span class="badge badge-${lastSvc.status.toLowerCase()}">${lastSvc.status}</span>` : ''}
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openServiceModal('${d.id}')">+ Servicio</button>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openServiceModal('${d._id}')">+ Servicio</button>
         </div>
       </div>`;
   }).join('');
@@ -137,9 +178,9 @@ function renderDevices() {
 
 function populateClientSelect(selId, preselect) {
   const sel = document.getElementById(selId);
-  sel.innerHTML = '<option value="">Selecciona un cliente...</option>' + 
-    clients.sort((a,b) => a.name.localeCompare(b.name)).map(c => 
-      `<option value="${c.id}" ${preselect===c.id?'selected':''}>${c.name} - ${c.phone}</option>`
+  sel.innerHTML = '<option value="">Selecciona un cliente...</option>' +
+    clients.slice().sort((a,b) => a.name.localeCompare(b.name)).map(c =>
+      `<option value="${c._id}" ${preselect===c._id?'selected':''}>${c.name} - ${c.phone}</option>`
     ).join('');
 }
 
@@ -147,38 +188,43 @@ function populateDeviceSelect(selId, preselect, clientId) {
   const sel = document.getElementById(selId);
   let devs = devices;
   if (clientId) devs = devices.filter(d => d.clientId === clientId);
-  sel.innerHTML = '<option value="">Selecciona un equipo...</option>' + 
-    devs.sort((a,b) => b.createdAt - a.createdAt).map(d => {
-      const c = clients.find(x => x.id === d.clientId);
-      return `<option value="${d.id}" ${preselect===d.id?'selected':''}>${d.type} ${d.brand} ${d.model||''} - ${c?c.name:'Sin cliente'}</option>`;
+  sel.innerHTML = '<option value="">Selecciona un equipo...</option>' +
+    devs.slice().sort((a,b) => b.createdAt - a.createdAt).map(d => {
+      const c = clients.find(x => x._id === d.clientId);
+      return `<option value="${d._id}" ${preselect===d._id?'selected':''}>${d.type} ${d.brand} ${d.model||''} - ${c?c.name:'Sin cliente'}</option>`;
     }).join('');
 }
 
-function saveDevice() {
+async function saveDevice() {
   const clientId = document.getElementById('dClientId').value;
   const brand = document.getElementById('dBrand').value.trim();
   if (!clientId) { alert('Selecciona un cliente'); return; }
   if (!brand) { alert('La marca es obligatoria'); return; }
-  devices.push({
-    id: genId(), clientId,
-    type: document.getElementById('dType').value,
-    brand, model: document.getElementById('dModel').value.trim(),
-    serial: document.getElementById('dSerial').value.trim(),
-    specs: document.getElementById('dSpecs').value.trim(),
-    createdAt: Date.now()
-  });
-  saveAll();
-  closeModal('device');
-  ['dBrand','dModel','dSerial','dSpecs'].forEach(id => document.getElementById(id).value = '');
-  renderDevices();
+  try {
+    const newDevice = await apiPost('/devices', {
+      clientId,
+      type: document.getElementById('dType').value,
+      brand,
+      model: document.getElementById('dModel').value.trim(),
+      serial: document.getElementById('dSerial').value.trim(),
+      specs: document.getElementById('dSpecs').value.trim()
+    });
+    devices.push(newDevice);
+    updateStats();
+    closeModal('device');
+    ['dBrand','dModel','dSerial','dSpecs'].forEach(id => document.getElementById(id).value = '');
+    renderDevices();
+  } catch (err) {
+    alert('Error al guardar el equipo: ' + err.message);
+  }
 }
 
 function renderHistory() {
   const q = document.getElementById('searchHistory').value.toLowerCase();
   const list = document.getElementById('historyList');
   const filtered = services.filter(s => {
-    const d = devices.find(x => x.id === s.deviceId);
-    const c = d ? clients.find(x => x.id === d.clientId) : null;
+    const d = devices.find(x => x._id === s.deviceId);
+    const c = d ? clients.find(x => x._id === d.clientId) : null;
     return (s.description || '').toLowerCase().includes(q) ||
            (s.serviceType || '').toLowerCase().includes(q) ||
            (s.notes || '').toLowerCase().includes(q) ||
@@ -192,8 +238,8 @@ function renderHistory() {
   }
 
   list.innerHTML = filtered.map(s => {
-    const d = devices.find(x => x.id === s.deviceId);
-    const c = d ? clients.find(x => x.id === d.clientId) : null;
+    const d = devices.find(x => x._id === s.deviceId);
+    const c = d ? clients.find(x => x._id === d.clientId) : null;
     const dateStr = new Date(s.date).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
     return `
       <div class="history-item">
@@ -207,8 +253,8 @@ function renderHistory() {
         ${s.reminderDate ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:6px;">🔔 Próximo mantenimiento: ${new Date(s.reminderDate).toLocaleDateString('es-CO')}</div>` : ''}
         ${s.notes ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:6px; font-style:italic;">📝 ${s.notes}</div>` : ''}
         <div style="display:flex; gap:8px; margin-top:10px;">
-          <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">✏️ Editar</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">🗑️ Eliminar</button>
+          <button class="btn btn-sm btn-secondary" onclick="editService('${s._id}')">✏️ Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteService('${s._id}')">🗑️ Eliminar</button>
         </div>
       </div>`;
   }).join('');
@@ -219,47 +265,45 @@ function clearServiceForm() {
   document.getElementById('sReminderMonths').value = '';
 }
 
-function saveService() {
+async function saveService() {
   const deviceId = document.getElementById('sDeviceId').value;
   const description = document.getElementById('sDescription').value.trim();
   if (!deviceId) { alert('Selecciona un equipo'); return; }
   if (!description) { alert('La descripción es obligatoria'); return; }
   const months = parseInt(document.getElementById('sReminderMonths').value) || 0;
-  const now = Date.now();
   let reminderDate = null;
   if (months > 0) {
-    const d = new Date(now);
+    const d = new Date();
     d.setMonth(d.getMonth() + months);
     reminderDate = d.getTime();
   }
 
-  if (editingServiceId) {
-    // Actualiza el servicio existente en lugar de crear uno nuevo
-    const s = services.find(x => x.id === editingServiceId);
-    if (s) {
-      s.deviceId = deviceId;
-      s.serviceType = document.getElementById('sServiceType').value;
-      s.description = description;
-      s.price = rawPrice(document.getElementById('sPrice').value);
-      s.status = document.getElementById('sStatus').value;
-      s.notes = document.getElementById('sNotes').value.trim();
-      if (months > 0) { s.reminderDate = reminderDate; s.reminderDone = false; }
+  const payload = {
+    deviceId,
+    serviceType: document.getElementById('sServiceType').value,
+    description,
+    price: rawPrice(document.getElementById('sPrice').value),
+    status: document.getElementById('sStatus').value,
+    notes: document.getElementById('sNotes').value.trim()
+  };
+  // Solo se toca el recordatorio si el usuario indicó meses (igual que la lógica original)
+  if (months > 0) { payload.reminderDate = reminderDate; payload.reminderDone = false; }
+
+  try {
+    if (editingServiceId) {
+      const updated = await apiPut(`/services/${editingServiceId}`, payload);
+      const idx = services.findIndex(s => s._id === editingServiceId);
+      if (idx !== -1) services[idx] = updated;
+    } else {
+      const created = await apiPost('/services', payload);
+      services.push(created);
     }
-  } else {
-    services.push({
-      id: genId(), deviceId,
-      serviceType: document.getElementById('sServiceType').value,
-      description,
-      price: rawPrice(document.getElementById('sPrice').value),
-      status: document.getElementById('sStatus').value,
-      notes: document.getElementById('sNotes').value.trim(),
-      date: now,
-      reminderDate,
-      reminderDone: false
-    });
+  } catch (err) {
+    alert('Error al guardar el servicio: ' + err.message);
+    return;
   }
 
-  saveAll();
+  updateStats();
   closeModal('service');
   clearServiceForm();
   editingServiceId = null;
@@ -271,7 +315,7 @@ function saveService() {
 }
 
 function editService(id) {
-  const s = services.find(x => x.id === id);
+  const s = services.find(x => x._id === id);
   if (!s) return;
   editingServiceId = id;
   openModal('service');
@@ -286,14 +330,19 @@ function editService(id) {
   document.getElementById('serviceSaveBtn').textContent = 'Guardar Cambios';
 }
 
-function deleteService(id) {
+async function deleteService(id) {
   if (!confirm('¿Eliminar este servicio? Esta acción no se puede deshacer.')) return;
-  services = services.filter(s => s.id !== id);
-  saveAll();
-  renderHistory();
-  renderReminders();
-  if (!document.getElementById('view-devices').classList.contains('hidden')) renderDevices();
-  refreshDetailIfOpen();
+  try {
+    await apiDelete(`/services/${id}`);
+    services = services.filter(s => s._id !== id);
+    updateStats();
+    renderHistory();
+    renderReminders();
+    if (!document.getElementById('view-devices').classList.contains('hidden')) renderDevices();
+    refreshDetailIfOpen();
+  } catch (err) {
+    alert('Error al eliminar el servicio: ' + err.message);
+  }
 }
 
 function refreshDetailIfOpen() {
@@ -315,8 +364,8 @@ function renderReminders() {
   }
 
   list.innerHTML = upcoming.map(s => {
-    const d = devices.find(x => x.id === s.deviceId);
-    const c = d ? clients.find(x => x.id === d.clientId) : null;
+    const d = devices.find(x => x._id === s.deviceId);
+    const c = d ? clients.find(x => x._id === d.clientId) : null;
     const overdue = s.reminderDate <= now;
     const dateStr = new Date(s.reminderDate).toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
     return `
@@ -326,26 +375,30 @@ function renderReminders() {
         <div class="history-desc">👤 ${c ? c.name : 'Cliente desconocido'} ${c ? '&nbsp;|&nbsp; 📞 ' + c.phone : ''}</div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
           <span class="reminder-badge ${overdue ? 'overdue' : ''}">${overdue ? 'Vencido - contactar cliente' : 'Próximo'}</span>
-          <button class="btn btn-sm btn-secondary" onclick="dismissReminder('${s.id}')">✔️ Marcar hecho</button>
+          <button class="btn btn-sm btn-secondary" onclick="dismissReminder('${s._id}')">✔️ Marcar hecho</button>
         </div>
       </div>`;
   }).join('');
 }
 
-function dismissReminder(serviceId) {
-  const s = services.find(x => x.id === serviceId);
-  if (!s) return;
-  s.reminderDone = true;
-  saveAll();
-  renderReminders();
+async function dismissReminder(serviceId) {
+  try {
+    const updated = await apiPut(`/services/${serviceId}`, { reminderDone: true });
+    const idx = services.findIndex(s => s._id === serviceId);
+    if (idx !== -1) services[idx] = updated;
+    updateStats();
+    renderReminders();
+  } catch (err) {
+    alert('Error al actualizar el recordatorio: ' + err.message);
+  }
 }
 
 function showClientDetail(clientId) {
-  const c = clients.find(x => x.id === clientId);
+  const c = clients.find(x => x._id === clientId);
   if (!c) return;
   const clientDevices = devices.filter(d => d.clientId === clientId);
   const clientServices = services.filter(s => {
-    const d = devices.find(x => x.id === s.deviceId);
+    const d = devices.find(x => x._id === s.deviceId);
     return d && d.clientId === clientId;
   }).sort((a,b) => b.date - a.date);
 
@@ -357,10 +410,10 @@ function showClientDetail(clientId) {
       ${c.address ? `<p style="color:var(--text-secondary); font-size:14px; margin:4px 0;">📍 ${c.address}</p>` : ''}
     </div>
     <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-      <button class="btn btn-primary btn-sm" onclick="openDeviceModal('${c.id}')">+ Agregar Equipo</button>
-      <button class="btn btn-primary btn-sm" onclick="openQuoteModal('${c.id}')">🧾 Nueva Cotización</button>
-      <button class="btn btn-secondary btn-sm" onclick="editClient('${c.id}')">✏️ Editar</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteClient('${c.id}')">🗑️ Eliminar</button>
+      <button class="btn btn-primary btn-sm" onclick="openDeviceModal('${c._id}')">+ Agregar Equipo</button>
+      <button class="btn btn-primary btn-sm" onclick="openQuoteModal('${c._id}')">🧾 Nueva Cotización</button>
+      <button class="btn btn-secondary btn-sm" onclick="editClient('${c._id}')">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteClient('${c._id}')">🗑️ Eliminar</button>
     </div>
   `;
 
@@ -369,7 +422,7 @@ function showClientDetail(clientId) {
     html += '<p style="color:var(--text-secondary); font-size:14px;">No hay equipos registrados.</p>';
   } else {
     html += clientDevices.map(d => {
-      const svc = services.filter(s => s.deviceId === d.id).sort((a,b) => b.date - a.date);
+      const svc = services.filter(s => s.deviceId === d._id).sort((a,b) => b.date - a.date);
       const last = svc[0];
       return `
         <div class="device-card">
@@ -380,8 +433,8 @@ function showClientDetail(clientId) {
           <div class="device-meta">Serial: ${d.serial||'N/A'} &nbsp;|&nbsp; ${svc.length} servicio${svc.length!==1?'s':''}</div>
           ${d.specs ? `<div class="device-meta" style="margin-top:4px;">🖥️ ${d.specs}</div>` : ''}
           <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-sm btn-primary" onclick="openServiceModal('${d.id}')">+ Servicio</button>
-            <button class="btn btn-sm btn-secondary" onclick="showDeviceDetail('${d.id}')">Ver historial</button>
+            <button class="btn btn-sm btn-primary" onclick="openServiceModal('${d._id}')">+ Servicio</button>
+            <button class="btn btn-sm btn-secondary" onclick="showDeviceDetail('${d._id}')">Ver historial</button>
           </div>
         </div>`;
     }).join('');
@@ -392,7 +445,7 @@ function showClientDetail(clientId) {
     html += '<p style="color:var(--text-secondary); font-size:14px;">No hay servicios registrados.</p>';
   } else {
     html += clientServices.map(s => {
-      const d = devices.find(x => x.id === s.deviceId);
+      const d = devices.find(x => x._id === s.deviceId);
       const dateStr = new Date(s.date).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
       return `
         <div class="history-item">
@@ -406,8 +459,8 @@ function showClientDetail(clientId) {
           ${s.reminderDate ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">🔔 Próximo mantenimiento: ${new Date(s.reminderDate).toLocaleDateString('es-CO')}</div>` : ''}
           ${s.notes ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:4px; font-style:italic;">📝 ${s.notes}</div>` : ''}
           <div style="display:flex; gap:8px; margin-top:10px;">
-            <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">✏️ Editar</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">🗑️ Eliminar</button>
+            <button class="btn btn-sm btn-secondary" onclick="editService('${s._id}')">✏️ Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteService('${s._id}')">🗑️ Eliminar</button>
           </div>
         </div>`;
     }).join('');
@@ -419,9 +472,9 @@ function showClientDetail(clientId) {
 }
 
 function showDeviceDetail(deviceId) {
-  const d = devices.find(x => x.id === deviceId);
+  const d = devices.find(x => x._id === deviceId);
   if (!d) return;
-  const c = clients.find(x => x.id === d.clientId);
+  const c = clients.find(x => x._id === d.clientId);
   const svc = services.filter(s => s.deviceId === deviceId).sort((a,b) => b.date - a.date);
 
   document.getElementById('detailTitle').innerHTML = '💻 ' + d.type + ' ' + d.brand + ' ' + (d.model||'');
@@ -432,9 +485,9 @@ function showDeviceDetail(deviceId) {
       ${d.specs ? `<p style="color:var(--text-secondary); font-size:14px; margin:4px 0;">🖥️ ${d.specs}</p>` : ''}
     </div>
     <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-      <button class="btn btn-primary btn-sm" onclick="openServiceModal('${d.id}')">+ Nuevo Servicio</button>
-      <button class="btn btn-secondary btn-sm" onclick="editDevice('${d.id}')">✏️ Editar</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteDevice('${d.id}')">🗑️ Eliminar</button>
+      <button class="btn btn-primary btn-sm" onclick="openServiceModal('${d._id}')">+ Nuevo Servicio</button>
+      <button class="btn btn-secondary btn-sm" onclick="editDevice('${d._id}')">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteDevice('${d._id}')">🗑️ Eliminar</button>
     </div>
     <h3 style="font-size:16px; margin:20px 0 12px;">📋 Historial completo del equipo</h3>
   `;
@@ -456,8 +509,8 @@ function showDeviceDetail(deviceId) {
           ${s.reminderDate ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">🔔 Próximo mantenimiento: ${new Date(s.reminderDate).toLocaleDateString('es-CO')}</div>` : ''}
           ${s.notes ? `<div style="font-size:12px; color:var(--text-secondary); margin-top:4px; font-style:italic;">📝 ${s.notes}</div>` : ''}
           <div style="display:flex; gap:8px; margin-top:10px;">
-            <button class="btn btn-sm btn-secondary" onclick="editService('${s.id}')">✏️ Editar</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteService('${s.id}')">🗑️ Eliminar</button>
+            <button class="btn btn-sm btn-secondary" onclick="editService('${s._id}')">✏️ Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteService('${s._id}')">🗑️ Eliminar</button>
           </div>
         </div>`;
     }).join('');
@@ -468,57 +521,84 @@ function showDeviceDetail(deviceId) {
   openModal('detail');
 }
 
-function editClient(id) {
-  const c = clients.find(x => x.id === id);
+async function editClient(id) {
+  const c = clients.find(x => x._id === id);
   if (!c) return;
   const name = prompt('Nombre:', c.name);
   if (name === null) return;
   const phone = prompt('Teléfono:', c.phone);
   if (phone === null) return;
-  c.name = name.trim() || c.name;
-  c.phone = phone.trim() || c.phone;
-  c.email = prompt('Email:', c.email || '') || c.email;
-  c.address = prompt('Dirección:', c.address || '') || c.address;
-  saveAll();
-  renderClients();
-  showClientDetail(id);
+  const emailInput = prompt('Email:', c.email || '');
+  const addressInput = prompt('Dirección:', c.address || '');
+  try {
+    const updated = await apiPut(`/clients/${id}`, {
+      name: name.trim() || c.name,
+      phone: phone.trim() || c.phone,
+      email: emailInput !== null ? emailInput.trim() : c.email,
+      address: addressInput !== null ? addressInput.trim() : c.address
+    });
+    Object.assign(c, updated);
+    renderClients();
+    showClientDetail(id);
+  } catch (err) {
+    alert('Error al actualizar el cliente: ' + err.message);
+  }
 }
 
-function deleteClient(id) {
+async function deleteClient(id) {
   if (!confirm('¿Eliminar este cliente y todos sus equipos/servicios?')) return;
-  const devIds = devices.filter(d => d.clientId === id).map(d => d.id);
-  services = services.filter(s => !devIds.includes(s.deviceId));
-  devices = devices.filter(d => d.clientId !== id);
-  clients = clients.filter(c => c.id !== id);
-  saveAll();
-  closeModal('detail');
-  renderClients();
-  renderDevices();
-  renderHistory();
+  try {
+    await apiDelete(`/clients/${id}`);
+    const devIds = devices.filter(d => d.clientId === id).map(d => d._id);
+    services = services.filter(s => !devIds.includes(s.deviceId));
+    devices = devices.filter(d => d.clientId !== id);
+    clients = clients.filter(c => c._id !== id);
+    updateStats();
+    closeModal('detail');
+    renderClients();
+    renderDevices();
+    renderHistory();
+  } catch (err) {
+    alert('Error al eliminar el cliente: ' + err.message);
+  }
 }
 
-function editDevice(id) {
-  const d = devices.find(x => x.id === id);
+async function editDevice(id) {
+  const d = devices.find(x => x._id === id);
   if (!d) return;
   const brand = prompt('Marca:', d.brand);
   if (brand === null) return;
-  d.brand = brand.trim() || d.brand;
-  d.model = prompt('Modelo:', d.model || '') || d.model;
-  d.serial = prompt('Serial:', d.serial || '') || d.serial;
-  d.specs = prompt('Especificaciones:', d.specs || '') || d.specs;
-  saveAll();
-  renderDevices();
-  showDeviceDetail(id);
+  const modelInput = prompt('Modelo:', d.model || '');
+  const serialInput = prompt('Serial:', d.serial || '');
+  const specsInput = prompt('Especificaciones:', d.specs || '');
+  try {
+    const updated = await apiPut(`/devices/${id}`, {
+      brand: brand.trim() || d.brand,
+      model: modelInput !== null ? modelInput.trim() : d.model,
+      serial: serialInput !== null ? serialInput.trim() : d.serial,
+      specs: specsInput !== null ? specsInput.trim() : d.specs
+    });
+    Object.assign(d, updated);
+    renderDevices();
+    showDeviceDetail(id);
+  } catch (err) {
+    alert('Error al actualizar el equipo: ' + err.message);
+  }
 }
 
-function deleteDevice(id) {
+async function deleteDevice(id) {
   if (!confirm('¿Eliminar este equipo y todo su historial?')) return;
-  services = services.filter(s => s.deviceId !== id);
-  devices = devices.filter(d => d.id !== id);
-  saveAll();
-  closeModal('detail');
-  renderDevices();
-  renderHistory();
+  try {
+    await apiDelete(`/devices/${id}`);
+    services = services.filter(s => s.deviceId !== id);
+    devices = devices.filter(d => d._id !== id);
+    updateStats();
+    closeModal('detail');
+    renderDevices();
+    renderHistory();
+  } catch (err) {
+    alert('Error al eliminar el equipo: ' + err.message);
+  }
 }
 
 function openModal(name) {
@@ -567,7 +647,7 @@ function renderQuotes() {
     const dateStr = new Date(x.date).toLocaleDateString('es-CO', { year:'numeric', month:'short', day:'numeric' });
     const status = x.status || 'Pendiente';
     return `
-      <div class="client-row" onclick="showQuoteDetail('${x.id}')">
+      <div class="client-row" onclick="showQuoteDetail('${x._id}')">
         <div class="client-info">
           <h4>Cotización No. ${x.number}</h4>
           <span>👤 ${x.clientName} &nbsp;|&nbsp; ${dateStr}</span>
@@ -575,14 +655,14 @@ function renderQuotes() {
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <span class="badge badge-${status.toLowerCase()}">${status}</span>
           <span class="history-price" style="margin:0;">$${total.toLocaleString('es-CO')}</span>
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); printQuote('${x.id}')">🖨️ Imprimir</button>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); printQuote('${x._id}')">🖨️ Imprimir</button>
         </div>
       </div>`;
   }).join('');
 }
 
 function newQuoteItem() {
-  return { id: genId(), desc: '', qty: 1, price: '' };
+  return { id: tempId(), desc: '', qty: 1, price: '' };
 }
 
 function renderQuoteItemsForm() {
@@ -632,17 +712,11 @@ function recalcQuoteTotals() {
 
 function fillQuoteClientFromSelect() {
   const id = document.getElementById('qClientId').value;
-  const c = clients.find(x => x.id === id);
+  const c = clients.find(x => x._id === id);
   if (c) {
     document.getElementById('qClientName').value = c.name;
     document.getElementById('qClientPhone').value = c.phone || '';
   }
-}
-
-function nextQuoteNumber() {
-  const year = new Date().getFullYear();
-  const countThisYear = quotations.filter(q => q.number && q.number.startsWith(year + '-')).length;
-  return year + '-' + String(countThisYear + 1).padStart(3, '0');
 }
 
 function openQuoteModal(clientId) {
@@ -661,48 +735,38 @@ function openQuoteModal(clientId) {
   renderQuoteItemsForm();
 }
 
-function saveQuote() {
+async function saveQuote() {
   const clientName = document.getElementById('qClientName').value.trim();
   if (!clientName) { alert('El nombre del cliente es obligatorio'); return; }
   const items = quoteItemsTemp.filter(it => it.desc.trim() !== '');
   if (!items.length) { alert('Agrega al menos un ítem con descripción'); return; }
   items.forEach(it => { if (!it.qty || it.qty < 1) it.qty = 1; });
 
-  const clientId = document.getElementById('qClientId').value || null;
-  const clientPhone = document.getElementById('qClientPhone').value.trim();
-  const validityDays = parseInt(document.getElementById('qValidityDays').value) || 15;
-  const paymentTerms = document.getElementById('qPaymentTerms').value.trim() || 'Contra entrega';
-  const conditions = document.getElementById('qConditions').value;
-  const tecnico = document.getElementById('qTecnico').value;
-  const cleanItems = items.map(it => ({ desc: it.desc.trim(), qty: it.qty, price: it.price || '0' }));
+  const payload = {
+    clientId: document.getElementById('qClientId').value || null,
+    clientName,
+    clientPhone: document.getElementById('qClientPhone').value.trim(),
+    items: items.map(it => ({ desc: it.desc.trim(), qty: it.qty, price: it.price || '0' })),
+    validityDays: parseInt(document.getElementById('qValidityDays').value) || 15,
+    paymentTerms: document.getElementById('qPaymentTerms').value.trim() || 'Contra entrega',
+    conditions: document.getElementById('qConditions').value,
+    tecnico: document.getElementById('qTecnico').value
+  };
 
-  if (editingQuoteId) {
-    const qu = quotations.find(x => x.id === editingQuoteId);
-    if (qu) {
-      qu.clientId = clientId;
-      qu.clientName = clientName;
-      qu.clientPhone = clientPhone;
-      qu.items = cleanItems;
-      qu.validityDays = validityDays;
-      qu.paymentTerms = paymentTerms;
-      qu.conditions = conditions;
-      qu.tecnico = tecnico;
+  try {
+    if (editingQuoteId) {
+      const updated = await apiPut(`/quotations/${editingQuoteId}`, payload);
+      const idx = quotations.findIndex(q => q._id === editingQuoteId);
+      if (idx !== -1) quotations[idx] = updated;
+    } else {
+      const created = await apiPost('/quotations', payload);
+      quotations.push(created);
     }
-  } else {
-    quotations.push({
-      id: genId(),
-      number: nextQuoteNumber(),
-      date: Date.now(),
-      clientId, clientName, clientPhone,
-      items: cleanItems,
-      validityDays, paymentTerms, conditions,
-      tecnico,
-      status: 'Pendiente',
-      createdAt: Date.now()
-    });
+  } catch (err) {
+    alert('Error al guardar la cotización: ' + err.message);
+    return;
   }
 
-  saveAll();
   closeModal('quote');
   editingQuoteId = null;
   renderQuotes();
@@ -710,10 +774,10 @@ function saveQuote() {
 }
 
 function editQuote(id) {
-  const qu = quotations.find(x => x.id === id);
+  const qu = quotations.find(x => x._id === id);
   if (!qu) return;
   editingQuoteId = id;
-  quoteItemsTemp = qu.items.map(it => ({ id: genId(), desc: it.desc, qty: it.qty, price: it.price }));
+  quoteItemsTemp = qu.items.map(it => ({ id: tempId(), desc: it.desc, qty: it.qty, price: it.price }));
   openModal('quote');
   populateClientSelect('qClientId', qu.clientId);
   document.getElementById('qClientName').value = qu.clientName;
@@ -727,26 +791,33 @@ function editQuote(id) {
   document.getElementById('quoteSaveBtn').textContent = 'Guardar Cambios';
 }
 
-function deleteQuote(id) {
+async function deleteQuote(id) {
   if (!confirm('¿Eliminar esta cotización? Esta acción no se puede deshacer.')) return;
   const wasOpenInDetail = currentDetail && currentDetail.type === 'quote' && currentDetail.id === id;
-  quotations = quotations.filter(q => q.id !== id);
-  saveAll();
-  renderQuotes();
-  if (wasOpenInDetail) closeModal('detail');
+  try {
+    await apiDelete(`/quotations/${id}`);
+    quotations = quotations.filter(q => q._id !== id);
+    renderQuotes();
+    if (wasOpenInDetail) closeModal('detail');
+  } catch (err) {
+    alert('Error al eliminar la cotización: ' + err.message);
+  }
 }
 
-function updateQuoteStatus(id, status) {
-  const qu = quotations.find(x => x.id === id);
-  if (!qu) return;
-  qu.status = status;
-  saveAll();
-  renderQuotes();
-  showQuoteDetail(id);
+async function updateQuoteStatus(id, status) {
+  try {
+    const updated = await apiPut(`/quotations/${id}`, { status });
+    const idx = quotations.findIndex(x => x._id === id);
+    if (idx !== -1) quotations[idx] = updated;
+    renderQuotes();
+    showQuoteDetail(id);
+  } catch (err) {
+    alert('Error al actualizar el estado: ' + err.message);
+  }
 }
 
 function showQuoteDetail(id) {
-  const qu = quotations.find(x => x.id === id);
+  const qu = quotations.find(x => x._id === id);
   if (!qu) return;
   const total = qu.items.reduce((s,it) => s + (it.qty||0) * (parseFloat(it.price)||0), 0);
   const dateStr = new Date(qu.date).toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
@@ -759,10 +830,10 @@ function showQuoteDetail(id) {
       <p style="color:var(--text-secondary); font-size:14px; margin:4px 0;">📅 Fecha: ${dateStr}</p>
     </div>
     <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; align-items:center;">
-      <button class="btn btn-primary btn-sm" onclick="printQuote('${qu.id}')">🖨️ Imprimir / PDF</button>
-      <button class="btn btn-secondary btn-sm" onclick="editQuote('${qu.id}')">✏️ Editar</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteQuote('${qu.id}')">🗑️ Eliminar</button>
-      <select onchange="updateQuoteStatus('${qu.id}', this.value)" style="padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; background:var(--surface); color:var(--text-primary);">
+      <button class="btn btn-primary btn-sm" onclick="printQuote('${qu._id}')">🖨️ Imprimir / PDF</button>
+      <button class="btn btn-secondary btn-sm" onclick="editQuote('${qu._id}')">✏️ Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteQuote('${qu._id}')">🗑️ Eliminar</button>
+      <select onchange="updateQuoteStatus('${qu._id}', this.value)" style="padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:13px; background:var(--surface); color:var(--text-primary);">
         <option value="Pendiente" ${status==='Pendiente'?'selected':''}>Pendiente</option>
         <option value="Aprobada" ${status==='Aprobada'?'selected':''}>Aprobada</option>
         <option value="Rechazada" ${status==='Rechazada'?'selected':''}>Rechazada</option>
@@ -786,7 +857,7 @@ function showQuoteDetail(id) {
 }
 
 function printQuote(id) {
-  const qu = quotations.find(x => x.id === id);
+  const qu = quotations.find(x => x._id === id);
   if (!qu) return;
   const subtotal = qu.items.reduce((s,it) => s + (it.qty||0) * (parseFloat(it.price)||0), 0);
   const dateStr = new Date(qu.date).toLocaleDateString('es-CO', { year:'numeric', month:'long', day:'numeric' });
@@ -847,41 +918,45 @@ function printQuote(id) {
 
 /* ==================== FIN COTIZACIONES ==================== */
 
-function exportBackup() {
-  const data = { clients, devices, services, quotations, exportDate: Date.now() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'tallerpro_backup_' + new Date().toISOString().slice(0,10) + '.json';
-  a.click();
-  URL.revokeObjectURL(url);
+async function exportBackup() {
+  try {
+    const data = await apiGet('/backup');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backup_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Error al exportar el backup: ' + err.message);
+  }
 }
 
 function importBackup(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (!confirm('Esto reemplazará todos los datos actuales. ¿Continuar?')) return;
-      clients = data.clients || [];
-      devices = data.devices || [];
-      services = data.services || [];
-      quotations = data.quotations || [];
-      saveAll();
+      if (!confirm('Esto reemplazará todos los datos actuales en el servidor. ¿Continuar?')) return;
+      await apiPost('/backup/restore', data);
+      await loadAll();
       renderClients();
       renderDevices();
       renderHistory();
       alert('Backup restaurado correctamente');
     } catch (err) {
-      alert('Archivo inválido');
+      alert('Archivo inválido o error al restaurar: ' + err.message);
     }
   };
   reader.readAsText(file);
   input.value = '';
 }
 
-updateStats();
-renderClients();
+// Carga inicial de datos desde la API
+loadAll().then(renderClients).catch(err => {
+  console.error('Error cargando datos iniciales:', err);
+  alert('No se pudo conectar con el servidor. Verifica que el backend esté corriendo.');
+});
