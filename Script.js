@@ -1,7 +1,7 @@
 // Si el frontend se sirve desde el mismo servidor Express, deja API_BASE = '/api'.
 // Si lo sirves aparte (ej. otro puerto/dominio), cambia esto por la URL completa,
 // ej: 'http://localhost:3000/api'
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'https://gestion-de-equipos-back.vercel.app/api';
 
 async function apiRequest(path, options = {}) {
   const res = await fetch(API_BASE + path, {
