@@ -889,7 +889,7 @@ function printQuote(id) {
       </div>
       <h2 class="qp-title">COTIZACIÓN No. ${qu.number}</h2>
       <p>Fecha: ${dateStr}</p>
-      <p><strong>Cliente:</strong><br>${qu.clientName}${qu.clientPhone ? '<br>' + qu.clientPhone : ''}</p>
+      <p><strong>Cliente:</strong><br><strong>${qu.clientName}${qu.clientPhone ? '<br>' + qu.clientPhone : ''}</strong></p>
       <p>Cordial saludo,</p>
       <p>De acuerdo con su solicitud, nos permitimos presentar la siguiente cotización:</p>
       <table class="qp-table">
@@ -907,10 +907,11 @@ function printQuote(id) {
       <p>Agradecemos la oportunidad de presentarle esta cotización.<br>Quedamos atentos a cualquier duda o ajuste que requiera.</p>
       <div class="qp-signature">
         <strong>${(qu.tecnico || 'JUAN PABLO GRANJA').toUpperCase()}</strong><br>
-        ${qu.tecnico === 'Leidy Tatiana Montoya' ? 'Tecnóloga en Sistemas' : 'Tecnólogo en Sistemas'}<br>
-        Cel: 305 239 9750<br>
-        "El Mundo de la Tecnología"
+        <strong>${qu.tecnico === 'Leidy Tatiana Montoya' ? 'Tecnóloga en Sistemas' : 'Tecnólogo en Sistemas'}<br></strong>
+        <strong>Cel: 305 239 9750<br></strong>
+        <strong>"El Mundo de la Tecnología"</strong>
       </div>
+      <p class="footer"><strong> “Think Different – Soporte profesional para tu mundo tecnológico”</strong></p>
     </div>
   `;
   setTimeout(() => window.print(), 150);
