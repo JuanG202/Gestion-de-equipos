@@ -31,10 +31,21 @@
 </style>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestión de Equipos</title>
-  <link rel="icon" type="image/png" href="/assests/trabajando-en-casa.png">
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/Script.js" defer></script>
+  <title>Gestión de Equipos — El Mundo de la Tecnología</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MundoTec">
+  <link rel="apple-touch-icon" href="assests/trabajando-en-casa.png">
+
+  <link rel="icon" type="image/png" href="assests/trabajando-en-casa.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="offline-queue.js" defer></script>
+  <script src="Script.js" defer></script>
 <base target="_blank">
 </head>
 <body>
@@ -42,8 +53,10 @@
   <div class="header">
     <div>
       <img class="img" src="./assests/El Mundo de la Tecnologia sin fondo.png">
-      <h1 class="title">EL MUNDO DE LA TECNOLOGIA</h1>
-      <p>Historial completo de clientes, equipos y cotizaciones</p>
+      <div>
+        <h1 class="title">EL MUNDO DE LA TECNOLOGIA</h1>
+        <p>Historial completo de clientes, equipos y cotizaciones</p>
+      </div>
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn btn-secondary" onclick="exportBackup()">⬇️ Backup</button>
@@ -74,6 +87,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('clients')" id="tab-clients">👥 Clientes</button>
     <button class="tab" onclick="switchTab('devices')" id="tab-devices">💻 Equipos</button>
+    <button class="tab" onclick="goToRates()" id="tab-rates">🛠️ Tarifas y Productos</button>
     <button class="tab" onclick="switchTab('quotes')" id="tab-quotes">🧾 Cotizaciones</button>
     <button class="tab" onclick="switchTab('history')" id="tab-history">📋 Historial</button>
     <button class="tab" onclick="switchTab('reminders')" id="tab-reminders">🔔 Recordatorios</button>
@@ -96,6 +110,22 @@
     </div>
     <div id="devicesList"></div>
   </div>
+
+  <!-- TARIFAS Y PRODUCTOS -->
+  <div id="view-rates" class="hidden">
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:28px;">
+      <div style="font-size:72px; line-height:1;">🛠️</div>
+      <div style="text-align:center;">
+        <h2 style="font-size:22px; font-weight:700; color:var(--text-primary); margin:0 0 10px;">Tarifas y Productos</h2>
+        <p style="color:var(--text-secondary); font-size:14px; margin:0 0 6px;">Administra los precios de tus servicios</p>
+        <p style="color:var(--text-secondary); font-size:14px; margin:0;">y el catálogo de productos con márgenes de ganancia</p>
+      </div>
+      <a href="precios.html" class="btn btn-primary" style="font-size:15px; padding:14px 32px; border-radius:12px; text-decoration:none; display:inline-flex; align-items:center; gap:10px;">
+        🚀 Ir a Tarifas y Productos
+      </a>
+    </div>
+  </div>
+
 
   <!-- COTIZACIONES -->
   <div id="view-quotes" class="hidden">
@@ -329,8 +359,29 @@
 
 </div>
 
-<!-- ÁREA DE IMPRESIÓN DE COTIZACIÓN (oculta en pantalla, visible solo al imprimir) -->
+<!-- ÁREA DE IMPRESIÓN -->
 <div id="quotePrintArea"></div>
+
+<!-- BADGE SINCRONIZACIÓN OFFLINE -->
+<div id="sync-badge" class="sync-badge oq-hidden">
+  <span class="sync-badge__icon">⏳</span>
+  <span id="sync-count">0 pendientes</span>
+  <button onclick="queueFlush()" class="sync-badge__btn">Sincronizar ahora</button>
+</div>
+
+<!-- TOAST NOTIFICACIONES -->
+<div id="sync-toast" class="sync-toast oq-hidden"></div>
+
+<!-- Registro del Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('[PWA] Service Worker registrado:', reg.scope))
+        .catch(err => console.warn('[PWA] Error al registrar SW:', err));
+    });
+  }
+</script>
 
 </body>
 </html>

@@ -1,0 +1,43 @@
+{
+  "name": "El Mundo de la Tecnología",
+  "short_name": "MundoTec",
+  "description": "Gestión de clientes, equipos, servicios y cotizaciones",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f0f4fa",
+  "theme_color": "#2563eb",
+  "lang": "es",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "assests/trabajando-en-casa.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assests/El Mundo de la Tecnologia sin fondo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Clientes",
+      "short_name": "Clientes",
+      "description": "Ver lista de clientes",
+      "url": "./index.html#clients",
+      "icons": [{ "src": "assests/trabajando-en-casa.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Tarifas y Productos",
+      "short_name": "Tarifas",
+      "description": "Administrar precios y productos",
+      "url": "./precios.html",
+      "icons": [{ "src": "assests/trabajando-en-casa.png", "sizes": "96x96" }]
+    }
+  ],
+  "categories": ["business", "productivity"]
+}

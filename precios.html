@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tarifas y Productos — El Mundo de la Tecnología</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="MundoTec">
+  <link rel="apple-touch-icon" href="assests/trabajando-en-casa.png">
+
+  <link rel="icon" type="image/png" href="assests/trabajando-en-casa.png">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* ── Navegación entre páginas ── */
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .nav-link {
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 20px;
+      border: 1.5px solid var(--border);
+      background: rgba(255,255,255,0.6);
+      color: var(--text2);
+      text-decoration: none;
+      transition: all 0.2s;
+      letter-spacing: 0.2px;
+    }
+    .nav-link:hover   { background: white; color: var(--accent); border-color: var(--accent); }
+    .nav-link.active  { background: var(--accent); color: white; border-color: var(--accent); box-shadow: 0 4px 12px rgba(26,111,212,0.28); }
+
+    /* ── Tabs servicios / productos ── */
+    .tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 24px;
+      background: rgba(255,255,255,0.5);
+      padding: 5px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      width: fit-content;
+    }
+    .tab-btn {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 9px 22px;
+      border-radius: 10px;
+      border: none;
+      background: none;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.2px;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 3px 10px rgba(26,111,212,0.28);
+    }
+    .tab-btn:not(.active):hover { background: rgba(26,111,212,0.08); color: var(--accent); }
+
+    .tab-panel { display: none; animation: fadeUp 0.3s ease both; }
+    .tab-panel.active { display: block; }
+
+    /* ── Formulario de items ── */
+    .item-form-grid {
+      display: grid;
+      gap: 12px;
+      align-items: end;
+    }
+    .item-form-grid.servicios { grid-template-columns: 2fr 1fr auto; }
+    .item-form-grid.productos { grid-template-columns: 2fr 1fr 1fr auto; }
+
+    /* ── Precio calculado preview ── */
+    .precio-preview {
+      background: var(--accent-light);
+      border: 1.5px solid rgba(26,111,212,0.2);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--accent);
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .precio-preview .label-small {
+      font-size: 0.7rem;
+      color: var(--text3);
+      font-weight: 500;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    /* ── Tabla de items ── */
+    .items-table th,
+    .items-table td { padding: 12px 14px; }
+
+    .items-table .col-precio { text-align: right; font-weight: 600; color: var(--accent); }
+    .items-table .col-costo  { text-align: right; color: var(--text2); }
+    .items-table .col-venta  { text-align: right; font-weight: 700; color: var(--green); }
+    .items-table .col-margen {
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .margen-badge {
+      display: inline-block;
+      background: var(--green-bg);
+      color: var(--green);
+      padding: 3px 9px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+
+    /* Botones de acción en tabla */
+    .btn-icon {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 5px 7px;
+      border-radius: 7px;
+      font-size: 0.95rem;
+      transition: background 0.15s, transform 0.1s;
+      line-height: 1;
+    }
+    .btn-icon:hover { background: rgba(0,0,0,0.06); transform: scale(1.1); }
+    .btn-icon.delete:hover { background: var(--red-bg); }
+
+    /* ── Chip de margen configurable ── */
+    .margen-config {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 16px;
+      margin-bottom: 18px;
+      width: fit-content;
+    }
+    .margen-config label { font-size: 0.82rem; font-weight: 600; color: var(--text2); }
+    .margen-config input[type=number] {
+      width: 70px;
+      text-align: center;
+      padding: 6px 10px;
+      font-weight: 700;
+      color: var(--accent);
+      border: 1.5px solid rgba(26,111,212,0.3);
+    }
+    .margen-config span { font-size: 0.85rem; font-weight: 600; color: var(--accent); }
+
+    /* ── Contador resumen ── */
+    .section-counter {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text3);
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 10px;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    /* Modo edición inline */
+    .editing td { background: var(--accent-light) !important; }
+
+    @media (max-width: 700px) {
+      .item-form-grid.servicios,
+      .item-form-grid.productos { grid-template-columns: 1fr 1fr; }
+      .tabs { width: 100%; }
+      .tab-btn { flex: 1; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container" id="appContainer">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-badge">🛠️ Tarifas y Productos</div>
+    </div>
+    <h1>Tarifas y Productos</h1>
+    <p>Administra los precios de tus servicios y el catálogo de productos con márgenes</p>
+  </div>
+
+  <!-- Navegación -->
+  <div class="nav-bar">
+    <a href="index.html" class="nav-link">← Gestión de Equipos</a>
+    <a href="precios.html"            class="nav-link active">🛠️ Tarifas y Productos</a>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('servicios', this)">🔧 Servicios</button>
+<button class="tab-btn" onclick="switchTab('productos', this)">📦 Productos</button>
+  </div>
+
+  <!-- ══════════════════ TAB SERVICIOS ══════════════════ -->
+  <div id="tab-servicios" class="tab-panel active">
+
+    <div class="card">
+      <div class="card-title">
+        ➕ Nuevo Servicio
+        <span class="section-counter" id="cntServicios">0 servicios</span>
+      </div>
+
+      <div class="item-form-grid servicios">
+        <div class="field">
+          <label>Nombre del servicio</label>
+          <input type="text" id="svcNombre" placeholder="Ej: Instalación de Office, Formateo...">
+        </div>
+        <div class="field">
+          <label>Precio ($)</label>
+          <input type="text" id="svcPrecio" placeholder="0"
+            inputmode="decimal" autocomplete="off"
+            oninput="formatearValor(this)"
+            onkeydown="bloquearCaracteresInvalidos(event)">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn-add" onclick="agregarServicio()">Agregar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla servicios -->
+    <div class="table-card">
+      <div class="card-title">📋 Lista de Servicios</div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Servicio</th>
+            <th style="text-align:right">Precio</th>
+            <th style="text-align:center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaServicios">
+          <tr id="emptyServicios">
+            <td colspan="4">
+              <div class="empty-state">
+                <span class="icon">🔧</span>
+                Aún no has agregado servicios
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /tab-servicios -->
+
+  <!-- ══════════════════ TAB PRODUCTOS ══════════════════ -->
+  <div id="tab-productos" class="tab-panel">
+
+    <div class="card">
+      <div class="card-title">
+        ➕ Nuevo Producto
+        <span class="section-counter" id="cntProductos">0 productos</span>
+      </div>
+
+      <!-- Configurar margen -->
+      <div class="margen-config">
+        <label>Margen de ganancia:</label>
+        <input type="number" id="margenPct" value="15" min="1" max="200"
+          oninput="actualizarPreviewProducto()">
+        <span>%</span>
+      </div>
+
+      <div class="item-form-grid productos">
+        <div class="field">
+          <label>Nombre del producto</label>
+          <input type="text" id="prodNombre"
+            placeholder="Ej: Memoria RAM 8GB, Disco SSD 500GB...">
+        </div>
+        <div class="field">
+          <label>Precio costo ($)</label>
+          <input type="text" id="prodCosto" placeholder="0"
+            inputmode="decimal" autocomplete="off"
+            oninput="formatearValor(this); actualizarPreviewProducto()"
+            onkeydown="bloquearCaracteresInvalidos(event)">
+        </div>
+        <div class="field">
+          <label>Precio venta (con <span id="margenLabel">15</span>%)</label>
+          <div class="precio-preview" id="precioPreview">
+            <span>—</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn-add" onclick="agregarProducto()">Agregar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla productos -->
+    <div class="table-card">
+      <div class="card-title">📋 Catálogo de Productos</div>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Producto</th>
+            <th style="text-align:right">Costo</th>
+            <th style="text-align:right">Venta</th>
+            <th style="text-align:center">Margen</th>
+            <th style="text-align:center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaProductos">
+          <tr id="emptyProductos">
+            <td colspan="6">
+              <div class="empty-state">
+                <span class="icon">📦</span>
+                Aún no has agregado productos
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /tab-productos -->
+
+</div><!-- /container -->
+
+
+<script>
+/* ───────── SIN LOGIN ───────── */
+
+/* ───────── TABS ───────── */
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ───────── FORMATO ───────── */
+function formatearValor(input) {
+  let valor = input.value.replace(/\D/g, '');
+  input.value = valor.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+function bloquearCaracteresInvalidos(e) {
+  if (!/[0-9]/.test(e.key) && !['Backspace','ArrowLeft','ArrowRight','Delete'].includes(e.key)) {
+    e.preventDefault();
+  }
+}
+
+function getRaw(id) {
+  return parseFloat(document.getElementById(id).value.replace(/\./g,'')) || 0;
+}
+
+function fmt(n) {
+  return n.toLocaleString('es-CO');
+}
+
+/* ───────── PREVIEW PRODUCTO ───────── */
+function actualizarPreviewProducto() {
+  const costo = getRaw('prodCosto');
+  const margen = parseFloat(document.getElementById('margenPct').value) || 15;
+  const venta = costo * (1 + margen / 100);
+
+  document.getElementById('margenLabel').textContent = margen;
+
+  document.getElementById('precioPreview').innerHTML =
+    costo > 0
+      ? `<div><span class="label-small">Precio venta</span>$${fmt(venta)}</div>`
+      : '—';
+}
+
+/* ───────── SERVICIOS ───────── */
+async function agregarServicio() {
+  const nombre = document.getElementById('svcNombre').value.trim();
+  const precio = getRaw('svcPrecio');
+  const sesion = JSON.parse(localStorage.getItem('cf_sesion'));
+
+  if (!nombre || precio <= 0) return;
+
+  await fetch('https://control-backend-kappa.vercel.app/api/servicios', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nombre, precio, userId: sesion.id })
+  });
+
+  location.reload();
+}
+
+async function renderServicios() {
+  const sesion = JSON.parse(localStorage.getItem('cf_sesion'));
+  const res = await fetch(`https://control-backend-kappa.vercel.app/api/servicios/${sesion.id}`);
+  const lista = await res.json();
+
+  const tbody = document.getElementById('tablaServicios');
+  const counter = document.getElementById('cntServicios');
+
+  counter.textContent = lista.length + " servicios";
+
+  tbody.innerHTML = lista.length
+    ? lista.map((s,i)=>`
+        <tr>
+          <td>${i+1}</td>
+          <td>${s.nombre}</td>
+          <td style="text-align:right">$${fmt(s.precio)}</td>
+          <td></td>
+        </tr>`).join('')
+    : `<tr><td colspan="4">Sin servicios</td></tr>`;
+}
+
+/* ───────── PRODUCTOS ───────── */
+console.log("CLICK agregar producto");
+async function agregarProducto() {
+  const nombre = document.getElementById('prodNombre').value.trim();
+  const costo  = getRaw('prodCosto');
+  const margen = parseFloat(document.getElementById('margenPct').value) || 15;
+  const sesion = JSON.parse(localStorage.getItem('cf_sesion'));
+
+  if (!nombre || costo <= 0) return;
+
+  const precioVenta = costo * (1 + margen / 100);
+
+  const res = await fetch('https://gestion-de-equipos-back.vercel.app/api/productos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      nombre,
+      costo,
+      precioVenta,
+      margen,
+      userId: sesion.id
+    })
+  });
+
+  if (!res.ok) {
+    console.error("Error guardando producto");
+    return;
+  }
+
+ 
+  document.getElementById('prodNombre').value = '';
+  document.getElementById('prodCosto').value  = '';
+
+  actualizarPreviewProducto();
+
+  await renderProductos();
+}
+
+async function renderProductos() {
+  const sesion = JSON.parse(localStorage.getItem('cf_sesion'));
+  const res = await fetch(`https://gestion-de-equipos-back.vercel.app/api/productos/${sesion.id}`);
+  const lista = await res.json();
+
+  const tbody = document.getElementById('tablaProductos');
+  const counter = document.getElementById('cntProductos');
+
+  counter.textContent = lista.length + " productos";
+
+  tbody.innerHTML = lista.length
+    ? lista.map((p,i)=>`
+        <tr>
+          <td>${i+1}</td>
+          <td>${p.nombre}</td>
+          <td style="text-align:right">$${fmt(p.costo)}</td>
+          <td style="text-align:right">$${fmt(p.precioVenta)}</td>
+          <td style="text-align:center">+${p.margen}%</td>
+          <td></td>
+        </tr>`).join('')
+    : `<tr><td colspan="6">Sin productos</td></tr>`;
+}
+
+/* ───────── INIT ───────── */
+renderServicios();
+renderProductos();
+actualizarPreviewProducto();
+</script>
+
+<!-- Registro del Service Worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then(reg => console.log('[PWA] Service Worker registrado:', reg.scope))
+        .catch(err => console.warn('[PWA] Error al registrar SW:', err));
+    });
+  }
+</script>
+
+</body>
+</html>

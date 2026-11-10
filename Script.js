@@ -73,6 +73,10 @@ function updateStats() {
   document.getElementById('statReminders').textContent = dueCount;
 }
 
+function goToRates() {
+  window.location.href = 'precios.html';
+}
+
 function switchTab(tab) {
   ['clients','devices','quotes','history','reminders'].forEach(t => {
     document.getElementById('view-' + t).classList.add('hidden');
@@ -270,6 +274,10 @@ async function saveService() {
   const description = document.getElementById('sDescription').value.trim();
   if (!deviceId) { alert('Selecciona un equipo'); return; }
   if (!description) { alert('La descripción es obligatoria'); return; }
+  if (deviceId.startsWith('offline_')) {
+    alert('⚠️ Este equipo aún no se ha sincronizado. Espera conexión a internet antes de registrar servicios.');
+    return;
+  }
   const months = parseInt(document.getElementById('sReminderMonths').value) || 0;
   let reminderDate = null;
   if (months > 0) {
@@ -588,18 +596,8 @@ async function editDevice(id) {
 
 async function deleteDevice(id) {
   if (!confirm('¿Eliminar este equipo y todo su historial?')) return;
-  try {
-    await apiDelete(`/devices/${id}`);
-    services = services.filter(s => s.deviceId !== id);
-    devices = devices.filter(d => d._id !== id);
-    updateStats();
-    closeModal('detail');
-    renderDevices();
-    renderHistory();
-  } catch (err) {
-    alert('Error al eliminar el equipo: ' + err.message);
   }
-}
+
 
 function openModal(name) {
   // Cierra cualquier otro modal que esté abierto antes de mostrar el nuevo
